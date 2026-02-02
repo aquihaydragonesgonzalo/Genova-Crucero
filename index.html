@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="es" class="h-full">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+    <title>Génova 2026 | Guía PWA</title>
+
+    <!-- PWA Meta Tags -->
+    <meta name="theme-color" content="#1e3a8a" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="Génova 2026" />
+    <meta name="description" content="Guía personalizada para la escala en Génova 2026" />
+
+    <link rel="icon" href="https://blogger.googleusercontent.com/img/b/R29vZ2xl/AVvXsEjvVYlm-4zLxbxXytfjaMND4HGRSzqyWMEewJl-tKAd8Qs28rFd411YMWOfAV2YJu-IqqOB3KaBEw_0rFxpoFHCLiAHn7ZtqoxNYG1bZVZ4U7Q4cuIV9V-XU8JiyyT6aigIB0UJLpeWu4fXhfcQ_6nbrXd84YPRd7dZ8q1STw-rLcfTdkCTa5oAoPuTPZ8/s320/Gemini_Generated_Image_l4457il4457il445.png" />
+    <link rel="apple-touch-icon" href="https://blogger.googleusercontent.com/img/b/R29vZ2xl/AVvXsEjvVYlm-4zLxbxXytfjaMND4HGRSzqyWMEewJl-tKAd8Qs28rFd411YMWOfAV2YJu-IqqOB3KaBEw_0rFxpoFHCLiAHn7ZtqoxNYG1bZVZ4U7Q4cuIV9V-XU8JiyyT6aigIB0UJLpeWu4fXhfcQ_6nbrXd84YPRd7dZ8q1STw-rLcfTdkCTa5oAoPuTPZ8/s320/Gemini_Generated_Image_l4457il4457il445.png" />
+
+    <!-- Leaflet CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Roboto+Condensed:wght@300;400;700&display=swap" rel="stylesheet" />
+
+    <!-- Tailwind CSS (CDN kept for simplicity as requested) -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+      tailwind.config = {
+        theme: {
+          extend: {
+            colors: {
+              genova: {
+                50: '#eff6ff',
+                100: '#dbeafe',
+                200: '#bfdbfe',
+                300: '#93c5fd',
+                400: '#60a5fa',
+                500: '#3b82f6',
+                600: '#2563eb',
+                700: '#1d4ed8',
+                800: '#1e40af',
+                900: '#1e3a8a'
+              },
+              superba: {
+                gold: '#D97706',
+                red: '#BE123C',
+                blue: '#1E3A8A'
+              }
+            }
+          }
+        }
+      }
+    </script>
+    
+    <style>
+        html, body { height: 100%; width: 100%; margin: 0; padding: 0; overscroll-behavior-y: none; background-color: #f8fafc; }
+        body { font-family: 'Roboto Condensed', sans-serif; -webkit-tap-highlight-color: transparent; }
+        #root { height: 100%; width: 100%; display: flex; flex-direction: column; }
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+        
+        .custom-h-scrollbar::-webkit-scrollbar { height: 6px; }
+        .custom-h-scrollbar::-webkit-scrollbar-track { background: #f1f5f9; border-radius: 10px; }
+        .custom-h-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
+
+        /* Fix Leaflet attribution overlap on mobile */
+        .leaflet-bottom { bottom: 85px !important; }
+        
+        /* Pulse Animation for Map User Location */
+        @keyframes map-pulse {
+            0% { transform: scale(1); opacity: 0.8; }
+            100% { transform: scale(3); opacity: 0; }
+        }
+        @keyframes pulse-gps {
+            0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(59, 130, 246, 0.7); }
+            70% { transform: scale(1); box-shadow: 0 0 0 10px rgba(59, 130, 246, 0); }
+            100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(59, 130, 246, 0); }
+        }
+    </style>
+  <script type="importmap">
+{
+  "imports": {
+    "react": "https://esm.sh/react@^19.2.4",
+    "react-dom/": "https://esm.sh/react-dom@^19.2.4/",
+    "react/": "https://esm.sh/react@^19.2.4/",
+    "lucide-react": "https://esm.sh/lucide-react@^0.563.0",
+    "leaflet": "https://esm.sh/leaflet@^1.9.4",
+    "vite": "https://esm.sh/vite@^7.3.1",
+    "@vitejs/plugin-react": "https://esm.sh/@vitejs/plugin-react@^5.1.2"
+  }
+}
+</script>
+</head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/index.tsx"></script>
+  </body>
+</html>
