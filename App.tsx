@@ -74,7 +74,7 @@ const App: React.FC = () => {
                 </div>
             </header>
             <main className="flex-1 relative overflow-hidden">
-                {activeTab === 'timeline' && <div className="h-full overflow-y-auto no-scrollbar"><Timeline itinerary={itinerary} onToggleComplete={(id) => setItinerary(itinerary.map(a => a.id === id ? {...a, completed: !a.completed} : a))} onLocate={c => {setMapFocus(c); setActiveTab('map');}} onOpenAudioGuide={(act) => setAudioGuideActivity(act)} onImageClick={(url) => setFullScreenImage(url)} /></div>}
+                {activeTab === 'timeline' && <div className="h-full overflow-y-auto no-scrollbar"><Timeline itinerary={itinerary} userLocation={userLocation} onToggleComplete={(id) => setItinerary(itinerary.map(a => a.id === id ? {...a, completed: !a.completed} : a))} onLocate={c => {setMapFocus(c); setActiveTab('map');}} onOpenAudioGuide={(act) => setAudioGuideActivity(act)} onImageClick={(url) => setFullScreenImage(url)} /></div>}
                 {activeTab === 'map' && <MapComponent activities={itinerary} userLocation={userLocation} focusedLocation={mapFocus} />}
                 {activeTab === 'budget' && (
                     <div className="p-8 text-center text-slate-400 h-full flex flex-col items-center justify-center">

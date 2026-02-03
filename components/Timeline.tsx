@@ -3,10 +3,11 @@ import {
     CheckCircle2, Circle, MapPin, AlertTriangle, Clock, 
     Navigation, Headphones, Maximize2 
 } from 'lucide-react';
-import { Activity, Coords } from '../types';
+import { Activity, Coords, UserLocation } from '../types';
 
 interface TimelineProps {
     itinerary: Activity[];
+    userLocation: UserLocation | null;
     onToggleComplete: (id: string) => void;
     onLocate: (coords: Coords) => void;
     onOpenAudioGuide: (activity: Activity) => void;
@@ -53,7 +54,41 @@ const calculateTimeProgress = (startTime: string, endTime: string) => {
     return Math.min(100, Math.max(0, ((currentMinutes - startMinutes) / (endMinutes - startMinutes)) * 100));
 };
 
-const Timeline: React.FC<TimelineProps> = ({ itinerary, onToggleComplete, onLocate, onOpenAudioGuide, onImageClick }) => {
+// Haversine formula for distance in meters
+const getDistance = (lat1: number, lon1: number, lat2: number, lon2: number) => {
+    const R = 6371e3; // metres
+    const φ1 = lat1 * Math.PI/180;
+    const φ2 = lat2 * Math.PI/180;
+    const Δφ = (lat2-lat1) * Math.PI/180;
+    const Δλ = (lon2-lon1) * Math.PI/180;
+
+    const a = Math.sin(Δφ/2) * Math.sin(Δφ/2) +
+            Math.cos(φ1) * Math.cos(φ2) *
+            Math.sin(Δλ/2) * Math.sin(Δλ/2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+
+    return R * c;
+};
+
+// Bearing calculation for direction arrow
+const getBearing = (startLat: number, startLng: number, destLat: number, destLng: number) => {
+  const startLatRad = startLat * (Math.PI / 180);
+  const startLngRad = startLng * (Math.PI / 180);
+  const destLatRad = destLat * (Math.PI / 180);
+  const destLngRad = destLng * (Math.PI / 180);
+
+  const y = Math.sin(destLngRad - startLngRad) * Math.cos(destLatRad);
+  const x =
+    Math.cos(startLatRad) * Math.sin(destLatRad) -
+    Math.sin(startLatRad) * Math.cos(destLatRad) * Math.cos(destLngRad - startLngRad);
+
+  const brngRad = Math.atan2(y, x);
+  const brngDeg = (brngRad * 180) / Math.PI;
+
+  return (brngDeg + 360) % 360; // Normalize to 0-360
+};
+
+const Timeline: React.FC<TimelineProps> = ({ itinerary, userLocation, onToggleComplete, onLocate, onOpenAudioGuide, onImageClick }) => {
     return (
         <div className="pb-24 px-4 pt-4 max-w-lg mx-auto">
             <div className="flex justify-between items-end mb-6">
@@ -65,6 +100,9 @@ const Timeline: React.FC<TimelineProps> = ({ itinerary, onToggleComplete, onLoca
                     const prevAct = idx > 0 ? itinerary[idx - 1] : null;
                     const gap = prevAct ? calculateGap(prevAct.endTime, act.startTime) : 0;
                     
+                    const distance = userLocation ? getDistance(userLocation.lat, userLocation.lng, act.coords.lat, act.coords.lng) : null;
+                    const bearing = userLocation ? getBearing(userLocation.lat, userLocation.lng, act.coords.lat, act.coords.lng) : 0;
+
                     return (
                         <React.Fragment key={act.id}>
                             {gap > 0 && (
@@ -93,7 +131,27 @@ const Timeline: React.FC<TimelineProps> = ({ itinerary, onToggleComplete, onLoca
                                             </div>
                                             {act.notes === 'CRITICAL' && <AlertTriangle className="text-rose-600 animate-pulse" size={20} />}
                                         </div>
-                                        <div className="mb-3 text-sm text-slate-600 flex items-center flex-wrap gap-1"><MapPin size={14} className="mr-0.5 text-blue-700"/> {act.locationName}</div>
+                                        
+                                        <div className="flex justify-between items-center mb-3">
+                                            <div className="text-sm text-slate-600 flex items-center flex-wrap gap-1 max-w-[70%]">
+                                                <MapPin size={14} className="mr-0.5 text-blue-700"/> {act.locationName}
+                                            </div>
+                                            
+                                            {distance !== null && !act.completed && (
+                                                <div className="flex items-center gap-1.5 bg-blue-50 px-2 py-1 rounded-lg border border-blue-100 text-blue-900 shadow-sm animate-in fade-in duration-500">
+                                                    <Navigation 
+                                                        size={12} 
+                                                        className="text-blue-600 transition-all duration-700" 
+                                                        style={{ transform: `rotate(${bearing}deg)` }} 
+                                                    />
+                                                    <span className="text-[10px] font-black tracking-tight">
+                                                        {distance > 1000 
+                                                            ? `${(distance / 1000).toFixed(1)} km` 
+                                                            : `${Math.round(distance)} m`}
+                                                    </span>
+                                                </div>
+                                            )}
+                                        </div>
                                         
                                         {act.image && (
                                             <div className="relative mb-4 group cursor-pointer" onClick={() => act.image && onImageClick(act.image)}>
