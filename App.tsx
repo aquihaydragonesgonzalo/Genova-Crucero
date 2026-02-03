@@ -83,7 +83,7 @@ const App: React.FC = () => {
                         <p className="text-[10px] uppercase mt-1 opacity-60">Génova es accesible a pie</p>
                     </div>
                 )}
-                {activeTab === 'guide' && <Guide userLocation={userLocation} />}
+                {activeTab === 'guide' && <Guide userLocation={userLocation} itinerary={itinerary} />}
 
                 {audioGuideActivity && (
                     <div className="absolute inset-0 z-50 flex items-end sm:items-center justify-center p-4 bg-blue-950/40 backdrop-blur-sm animate-in fade-in duration-200">

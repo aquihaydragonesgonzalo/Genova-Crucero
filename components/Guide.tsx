@@ -1,16 +1,19 @@
 import React, { useState, useEffect } from 'react';
 import { 
     PhoneCall, Thermometer, Sun, Cloud, CloudRain, 
-    CloudLightning, Wind, CalendarDays, Languages, Volume2 
+    CloudLightning, Wind, CalendarDays, Languages, Volume2,
+    FileText, Download
 } from 'lucide-react';
-import { UserLocation, WeatherData } from '../types';
-import { PRONUNCIATIONS } from '../constants';
+import { jsPDF } from 'jspdf';
+import { UserLocation, WeatherData, Activity } from '../types';
+import { PRONUNCIATIONS, DATE_OF_VISIT } from '../constants';
 
 interface GuideProps {
     userLocation: UserLocation | null;
+    itinerary: Activity[];
 }
 
-const Guide: React.FC<GuideProps> = ({ userLocation }) => {
+const Guide: React.FC<GuideProps> = ({ userLocation, itinerary }) => {
     const [playing, setPlaying] = useState<string | null>(null);
     const [weather, setWeather] = useState<WeatherData | null>(null);
     const [loadingWeather, setLoadingWeather] = useState(true);
@@ -70,10 +73,117 @@ const Guide: React.FC<GuideProps> = ({ userLocation }) => {
         return new Intl.DateTimeFormat('es-ES', { weekday: 'short', day: 'numeric' }).format(date);
     };
 
+    const handleDownloadPDF = () => {
+        const doc = new jsPDF();
+        let yPos = 20;
+        const pageHeight = doc.internal.pageSize.height;
+        const margin = 15;
+        const colTime = 15;
+        const colContent = 45;
+        const maxWidth = 150;
+
+        // Header
+        doc.setFillColor(30, 58, 138); // blue-900
+        doc.rect(0, 0, 210, 30, 'F');
+        doc.setTextColor(255, 255, 255);
+        doc.setFontSize(22);
+        doc.setFont("helvetica", "bold");
+        doc.text("GÉNOVA 2026", margin, 18);
+        doc.setFontSize(10);
+        doc.text("GUÍA DE ESCALA & ITINERARIO", margin, 24);
+        doc.text(DATE_OF_VISIT, 160, 18);
+
+        yPos = 40;
+        doc.setTextColor(0, 0, 0);
+
+        itinerary.forEach((item, index) => {
+            // Page Break Check
+            if (yPos > pageHeight - 30) {
+                doc.addPage();
+                yPos = 20;
+            }
+
+            // Time Column
+            doc.setFont("helvetica", "bold");
+            doc.setFontSize(11);
+            doc.setTextColor(30, 58, 138);
+            doc.text(item.startTime, colTime, yPos);
+            doc.setFontSize(9);
+            doc.setTextColor(100, 100, 100);
+            doc.text(item.endTime, colTime, yPos + 5);
+
+            // Timeline Line
+            doc.setDrawColor(200, 200, 200);
+            doc.setLineWidth(0.5);
+            doc.line(colTime + 15, yPos + 2, colTime + 15, yPos + 20);
+            doc.circle(colTime + 15, yPos - 1, 1.5, 'F');
+
+            // Content Column
+            doc.setFont("helvetica", "bold");
+            doc.setFontSize(12);
+            doc.setTextColor(0, 0, 0);
+            doc.text(item.title, colContent, yPos);
+            yPos += 5;
+
+            // Location
+            doc.setFont("helvetica", "italic");
+            doc.setFontSize(9);
+            doc.setTextColor(100, 100, 100);
+            doc.text(item.locationName, colContent, yPos);
+            yPos += 5;
+
+            // Description
+            doc.setFont("helvetica", "normal");
+            doc.setFontSize(10);
+            doc.setTextColor(50, 50, 50);
+            const descLines = doc.splitTextToSize(item.description, maxWidth);
+            doc.text(descLines, colContent, yPos);
+            yPos += (descLines.length * 4);
+
+            // Key Details
+            if (item.keyDetails) {
+                yPos += 2;
+                doc.setFont("helvetica", "bold");
+                doc.setFontSize(9);
+                doc.setTextColor(180, 83, 9); // Amber
+                const detailLines = doc.splitTextToSize(`Tip: ${item.keyDetails}`, maxWidth);
+                doc.text(detailLines, colContent, yPos);
+                yPos += (detailLines.length * 4);
+            }
+
+            // Spacing for next item
+            yPos += 8;
+        });
+
+        // Footer
+        const totalPages = doc.getNumberOfPages();
+        for(let i = 1; i <= totalPages; i++) {
+            doc.setPage(i);
+            doc.setFontSize(8);
+            doc.setTextColor(150);
+            doc.text(`Página ${i} de ${totalPages}`, 100, pageHeight - 10, { align: 'center' });
+        }
+
+        doc.save("Genova_2026_Itinerario.pdf");
+    };
+
     return (
         <div className="pb-32 px-4 pt-6 max-w-lg mx-auto h-full overflow-y-auto no-scrollbar">
             <h2 className="text-2xl font-bold text-blue-900 mb-6 uppercase tracking-tight">Guía Superba</h2>
             
+            <div className="flex gap-4 mb-6">
+                <button 
+                    onClick={handleDownloadPDF}
+                    className="flex-1 bg-blue-900 text-white rounded-2xl p-4 shadow-lg active:scale-95 transition-all flex items-center justify-center gap-3"
+                >
+                    <div className="bg-white/20 p-2 rounded-full"><FileText size={20} /></div>
+                    <div className="text-left">
+                        <span className="block text-[10px] uppercase opacity-70 font-bold tracking-widest">Descargar</span>
+                        <span className="block text-sm font-black">ITINERARIO PDF</span>
+                    </div>
+                </button>
+            </div>
+
             <div className="mb-8 bg-rose-700 rounded-[2rem] p-6 shadow-xl text-white relative overflow-hidden">
                 <div className="absolute top-[-20px] right-[-20px] w-32 h-32 bg-white/10 rounded-full blur-2xl"></div>
                 <div className="relative z-10">
