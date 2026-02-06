@@ -3,7 +3,7 @@ import {
     CalendarClock, Map as MapIcon, Wallet, BookOpen, Anchor, 
     X, Play, Square, Headphones 
 } from 'lucide-react';
-import { Activity, UserLocation, Coords } from './types';
+import { Activity, UserLocation, Coords, Waypoint } from './types';
 import { INITIAL_ITINERARY, SHIP_ONBOARD_TIME } from './constants';
 import Timeline from './components/Timeline';
 import MapComponent from './components/MapComponent';
@@ -18,6 +18,28 @@ const App: React.FC = () => {
     const [audioGuideActivity, setAudioGuideActivity] = useState<Activity | null>(null);
     const [fullScreenImage, setFullScreenImage] = useState<string | null>(null);
     const [isPlaying, setIsPlaying] = useState(false);
+    
+    // Custom Waypoints State with LocalStorage persistence
+    const [customWaypoints, setCustomWaypoints] = useState<Waypoint[]>(() => {
+        try {
+            const saved = localStorage.getItem('genova_custom_waypoints');
+            return saved ? JSON.parse(saved) : [];
+        } catch (e) {
+            return [];
+        }
+    });
+
+    useEffect(() => {
+        localStorage.setItem('genova_custom_waypoints', JSON.stringify(customWaypoints));
+    }, [customWaypoints]);
+
+    const handleAddWaypoint = (name: string, lat: number, lng: number) => {
+        setCustomWaypoints(prev => [...prev, { name, lat, lng }]);
+    };
+
+    const handleDeleteWaypoint = (lat: number, lng: number) => {
+        setCustomWaypoints(prev => prev.filter(wp => wp.lat !== lat || wp.lng !== lng));
+    };
 
     useEffect(() => {
         const timer = setInterval(() => {
@@ -75,7 +97,16 @@ const App: React.FC = () => {
             </header>
             <main className="flex-1 relative overflow-hidden">
                 {activeTab === 'timeline' && <div className="h-full overflow-y-auto no-scrollbar"><Timeline itinerary={itinerary} userLocation={userLocation} onToggleComplete={(id) => setItinerary(itinerary.map(a => a.id === id ? {...a, completed: !a.completed} : a))} onLocate={c => {setMapFocus(c); setActiveTab('map');}} onOpenAudioGuide={(act) => setAudioGuideActivity(act)} onImageClick={(url) => setFullScreenImage(url)} /></div>}
-                {activeTab === 'map' && <MapComponent activities={itinerary} userLocation={userLocation} focusedLocation={mapFocus} />}
+                {activeTab === 'map' && (
+                    <MapComponent 
+                        activities={itinerary} 
+                        userLocation={userLocation} 
+                        focusedLocation={mapFocus}
+                        customWaypoints={customWaypoints}
+                        onAddWaypoint={handleAddWaypoint}
+                        onDeleteWaypoint={handleDeleteWaypoint}
+                    />
+                )}
                 {activeTab === 'budget' && (
                     <div className="p-8 text-center text-slate-400 h-full flex flex-col items-center justify-center">
                         <Wallet size={48} className="mb-4 text-blue-100" />

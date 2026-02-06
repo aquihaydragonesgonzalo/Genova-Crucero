@@ -1,21 +1,32 @@
 import React, { useEffect, useRef } from 'react';
 import L from 'leaflet';
-import { Activity, UserLocation, Coords } from '../types';
+import { Activity, UserLocation, Coords, Waypoint } from '../types';
 import { GPX_WAYPOINTS, GENOVA_TRACK } from '../constants';
 
 interface MapComponentProps {
     activities: Activity[];
     userLocation: UserLocation | null;
     focusedLocation: Coords | null;
+    customWaypoints: Waypoint[];
+    onAddWaypoint: (name: string, lat: number, lng: number) => void;
+    onDeleteWaypoint: (lat: number, lng: number) => void;
 }
 
-const MapComponent: React.FC<MapComponentProps> = ({ activities, userLocation, focusedLocation }) => {
+const MapComponent: React.FC<MapComponentProps> = ({ 
+    activities, 
+    userLocation, 
+    focusedLocation,
+    customWaypoints,
+    onAddWaypoint,
+    onDeleteWaypoint
+}) => {
     const mapContainerRef = useRef<HTMLDivElement>(null);
     const mapInstanceRef = useRef<L.Map | null>(null);
     const layersRef = useRef<L.Layer[]>([]);
     const userMarkerRef = useRef<L.Marker | null>(null);
     const accuracyCircleRef = useRef<L.Circle | null>(null);
 
+    // Initial Map Setup
     useEffect(() => {
         if (!mapContainerRef.current || mapInstanceRef.current) return;
         
@@ -42,20 +53,40 @@ const MapComponent: React.FC<MapComponentProps> = ({ activities, userLocation, f
             "Satélite": satelliteLayer
         };
         
-        // Custom styling for the control via standard Leaflet options usually suffices, 
-        // but we place it top-right to be accessible.
         L.control.layers(baseMaps, undefined, { 
             position: 'topright',
             collapsed: true 
         }).addTo(map);
 
         mapInstanceRef.current = map;
+        
         return () => {
             map.remove();
             mapInstanceRef.current = null;
         };
     }, []);
 
+    // Handle Map Interactions (Clicks)
+    useEffect(() => {
+        const map = mapInstanceRef.current;
+        if (!map) return;
+
+        const handleMapClick = (e: L.LeafletMouseEvent) => {
+            // Simple prompt to get name (UX could be improved with a modal, but this fits the "app" request efficiently)
+            const name = prompt("Nombre del nuevo punto de interés:");
+            if (name && name.trim() !== "") {
+                onAddWaypoint(name.trim(), e.latlng.lat, e.latlng.lng);
+            }
+        };
+
+        map.on('click', handleMapClick);
+
+        return () => {
+            map.off('click', handleMapClick);
+        };
+    }, [onAddWaypoint]);
+
+    // Render Markers (Activities + Custom + Tracks)
     useEffect(() => {
         const map = mapInstanceRef.current;
         if (!map) return;
@@ -64,7 +95,7 @@ const MapComponent: React.FC<MapComponentProps> = ({ activities, userLocation, f
         layersRef.current.forEach(layer => layer.remove());
         layersRef.current = [];
 
-        // Add Activity Markers
+        // 1. Add Activity Markers (Official Itinerary)
         activities.forEach(act => {
             const marker = L.marker([act.coords.lat, act.coords.lng]).addTo(map);
             marker.bindPopup(`
@@ -82,7 +113,48 @@ const MapComponent: React.FC<MapComponentProps> = ({ activities, userLocation, f
             layersRef.current.push(marker);
         });
 
-        // Add Waypoints
+        // 2. Add Custom User Waypoints
+        const customIcon = L.divIcon({
+            className: 'custom-waypoint-icon',
+            html: `<div style="width: 20px; height: 20px; background: #8b5cf6; border: 2px solid white; border-radius: 50%; box-shadow: 0 2px 5px rgba(0,0,0,0.3); display: flex; align-items: center; justify-content: center;"><div style="width: 6px; height: 6px; background: white; border-radius: 50%;"></div></div>`,
+            iconSize: [20, 20],
+            iconAnchor: [10, 10]
+        });
+
+        customWaypoints.forEach(wp => {
+            const marker = L.marker([wp.lat, wp.lng], { icon: customIcon }).addTo(map);
+            
+            // Create DOM element for popup to handle click events
+            const popupDiv = document.createElement('div');
+            popupDiv.style.fontFamily = "'Roboto Condensed', sans-serif";
+            popupDiv.style.textAlign = "center";
+            popupDiv.innerHTML = `
+                <div style="font-weight: bold; color: #6d28d9; margin-bottom: 5px;">${wp.name}</div>
+                <div style="font-size: 10px; color: #64748b;">Tus marcadores</div>
+            `;
+            
+            const deleteBtn = document.createElement('button');
+            deleteBtn.innerText = "Eliminar";
+            deleteBtn.style.marginTop = "8px";
+            deleteBtn.style.background = "#fee2e2";
+            deleteBtn.style.color = "#991b1b";
+            deleteBtn.style.border = "none";
+            deleteBtn.style.borderRadius = "4px";
+            deleteBtn.style.padding = "4px 8px";
+            deleteBtn.style.fontSize = "10px";
+            deleteBtn.style.fontWeight = "bold";
+            deleteBtn.style.cursor = "pointer";
+            
+            deleteBtn.onclick = () => {
+                onDeleteWaypoint(wp.lat, wp.lng);
+            };
+
+            popupDiv.appendChild(deleteBtn);
+            marker.bindPopup(popupDiv);
+            layersRef.current.push(marker);
+        });
+
+        // 3. Add Predefined GPX Waypoints
         GPX_WAYPOINTS.forEach(wpt => {
             const circleMarker = L.circleMarker([wpt.lat, wpt.lng], {
                 radius: 6, fillColor: "#BE123C", color: "#fff", weight: 2, opacity: 1, fillOpacity: 0.8
@@ -91,11 +163,13 @@ const MapComponent: React.FC<MapComponentProps> = ({ activities, userLocation, f
             layersRef.current.push(circleMarker);
         });
 
-        // Add Track
+        // 4. Add Track Polyline
         const polyline = L.polyline(GENOVA_TRACK, { color: '#1e3a8a', weight: 4, opacity: 0.7, dashArray: '8, 12' }).addTo(map);
         layersRef.current.push(polyline);
-    }, [activities]);
 
+    }, [activities, customWaypoints, onDeleteWaypoint]); // Re-run when activities or custom waypoints change
+
+    // Update User Location
     useEffect(() => {
         const map = mapInstanceRef.current;
         if (!map || !userLocation) return;
@@ -134,13 +208,21 @@ const MapComponent: React.FC<MapComponentProps> = ({ activities, userLocation, f
         }
     }, [userLocation]);
 
+    // Handle Focusing on specific location
     useEffect(() => {
         if (mapInstanceRef.current && focusedLocation) {
             mapInstanceRef.current.flyTo([focusedLocation.lat, focusedLocation.lng], 16);
         }
     }, [focusedLocation]);
 
-    return <div ref={mapContainerRef} className="w-full h-full z-0" />;
+    return (
+        <div className="relative w-full h-full">
+            <div ref={mapContainerRef} className="w-full h-full z-0" />
+            <div className="absolute bottom-6 left-1/2 -translate-x-1/2 bg-white/90 backdrop-blur-sm px-4 py-2 rounded-full shadow-lg z-[400] text-[10px] font-bold text-slate-500 border border-white/20 pointer-events-none">
+                Toca el mapa para añadir un punto
+            </div>
+        </div>
+    );
 };
 
 export default MapComponent;
