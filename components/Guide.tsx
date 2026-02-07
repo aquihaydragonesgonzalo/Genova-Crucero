@@ -2,21 +2,86 @@ import React, { useState, useEffect } from 'react';
 import { 
     PhoneCall, Thermometer, Sun, Cloud, CloudRain, 
     CloudLightning, Wind, CalendarDays, Languages, Volume2,
-    FileText, Download
+    FileText, Download, Clock, Footprints, Map, PiggyBank,
+    Timer, Navigation
 } from 'lucide-react';
 import { jsPDF } from 'jspdf';
 import { UserLocation, WeatherData, Activity } from '../types';
-import { PRONUNCIATIONS, DATE_OF_VISIT } from '../constants';
+import { PRONUNCIATIONS, DATE_OF_VISIT, SHIP_ONBOARD_TIME } from '../constants';
 
 interface GuideProps {
     userLocation: UserLocation | null;
     itinerary: Activity[];
 }
 
+// Helper to calculate distance
+const getDistance = (lat1: number, lon1: number, lat2: number, lon2: number) => {
+    const R = 6371e3; // metres
+    const φ1 = lat1 * Math.PI/180;
+    const φ2 = lat2 * Math.PI/180;
+    const Δφ = (lat2-lat1) * Math.PI/180;
+    const Δλ = (lon2-lon1) * Math.PI/180;
+
+    const a = Math.sin(Δφ/2) * Math.sin(Δφ/2) +
+            Math.cos(φ1) * Math.cos(φ2) *
+            Math.sin(Δλ/2) * Math.sin(Δλ/2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+
+    return R * c;
+};
+
 const Guide: React.FC<GuideProps> = ({ userLocation, itinerary }) => {
     const [playing, setPlaying] = useState<string | null>(null);
     const [weather, setWeather] = useState<WeatherData | null>(null);
     const [loadingWeather, setLoadingWeather] = useState(true);
+
+    // Stats Calculation
+    const calculateStats = () => {
+        // 1. Total Walking Distance
+        let totalDist = 0;
+        for (let i = 0; i < itinerary.length - 1; i++) {
+            totalDist += getDistance(
+                itinerary[i].coords.lat, itinerary[i].coords.lng,
+                itinerary[i+1].coords.lat, itinerary[i+1].coords.lng
+            );
+        }
+
+        // 2. Port Time (Arrival to Onboard Limit)
+        const arrivalAct = itinerary.find(a => a.id === 'arrival_port');
+        const arrivalTime = arrivalAct ? arrivalAct.startTime : "08:00";
+        const [arrH, arrM] = arrivalTime.split(':').map(Number);
+        const [limH, limM] = SHIP_ONBOARD_TIME.split(':').map(Number);
+        const portMinutes = (limH * 60 + limM) - (arrH * 60 + arrM);
+        const portHours = Math.floor(portMinutes / 60);
+        const portMinsRem = portMinutes % 60;
+
+        // 3. Tour Time (First activity to Return)
+        const startTour = itinerary[1]; // Index 1 usually starts the walking (Index 0 is Arrival)
+        const endTour = itinerary[itinerary.length - 3]; // Usually the return to terminal before deadline
+        
+        let tourStr = "--";
+        if (startTour && endTour) {
+            const [sH, sM] = startTour.startTime.split(':').map(Number);
+            const [eH, eM] = endTour.endTime.split(':').map(Number);
+            const tourMinutes = (eH * 60 + eM) - (sH * 60 + sM);
+            const tH = Math.floor(tourMinutes / 60);
+            const tM = tourMinutes % 60;
+            tourStr = `${tH}h ${tM}m`;
+        }
+
+        // 4. POIs
+        const pois = itinerary.filter(i => i.type === 'sightseeing').length;
+
+        return {
+            distance: (totalDist / 1000).toFixed(1),
+            portTime: `${portHours}h ${portMinsRem > 0 ? portMinsRem + 'm' : ''}`,
+            tourTime: tourStr,
+            pois,
+            savings: 65 * 2 // Estimated savings for 2 people (avg excursion price)
+        };
+    };
+
+    const stats = calculateStats();
 
     useEffect(() => {
         const fetchWeather = async () => {
@@ -171,6 +236,50 @@ const Guide: React.FC<GuideProps> = ({ userLocation, itinerary }) => {
         <div className="pb-32 px-4 pt-6 max-w-lg mx-auto h-full overflow-y-auto no-scrollbar">
             <h2 className="text-2xl font-bold text-blue-900 mb-6 uppercase tracking-tight">Guía Superba</h2>
             
+            {/* Expedition Summary Dashboard */}
+            <div className="bg-white rounded-[2rem] p-6 shadow-xl border border-blue-50 mb-8 relative overflow-hidden">
+                <div className="absolute top-0 right-0 w-32 h-32 bg-blue-50 rounded-bl-[4rem] -z-0"></div>
+                <h3 className="text-sm font-black uppercase tracking-[0.2em] text-blue-400 mb-5 relative z-10">Resumen Expedición</h3>
+                
+                <div className="grid grid-cols-2 gap-4 relative z-10">
+                    <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100 flex flex-col items-center text-center">
+                        <Clock className="text-blue-600 mb-2" size={20} />
+                        <span className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">Estancia Puerto</span>
+                        <span className="text-lg font-black text-slate-800 leading-tight">{stats.portTime}</span>
+                        <span className="text-[9px] text-slate-400">Total disponible</span>
+                    </div>
+
+                    <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100 flex flex-col items-center text-center">
+                        <Timer className="text-amber-600 mb-2" size={20} />
+                        <span className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">Tiempo Turismo</span>
+                        <span className="text-lg font-black text-slate-800 leading-tight">{stats.tourTime}</span>
+                        <span className="text-[9px] text-slate-400">Actividad a pie</span>
+                    </div>
+
+                    <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100 flex flex-col items-center text-center">
+                        <Footprints className="text-emerald-600 mb-2" size={20} />
+                        <span className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">Distancia</span>
+                        <span className="text-lg font-black text-slate-800 leading-tight">~{stats.distance} km</span>
+                        <span className="text-[9px] text-slate-400">Recorrido total</span>
+                    </div>
+
+                    <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100 flex flex-col items-center text-center">
+                        <Map className="text-indigo-600 mb-2" size={20} />
+                        <span className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">Puntos Interés</span>
+                        <span className="text-lg font-black text-slate-800 leading-tight">{stats.pois}</span>
+                        <span className="text-[9px] text-slate-400">Lugares visitados</span>
+                    </div>
+                </div>
+
+                <div className="mt-4 pt-4 border-t border-slate-100 flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                        <PiggyBank size={18} className="text-rose-500" />
+                        <span className="text-xs font-bold text-slate-600">Ahorro Estimado</span>
+                    </div>
+                    <span className="text-sm font-black text-rose-600">~{stats.savings}€ <span className="text-[9px] font-normal text-slate-400">(vs Excursión)</span></span>
+                </div>
+            </div>
+
             <div className="flex gap-4 mb-6">
                 <button 
                     onClick={handleDownloadPDF}
