@@ -33,8 +33,8 @@ const App: React.FC = () => {
         localStorage.setItem('genova_custom_waypoints', JSON.stringify(customWaypoints));
     }, [customWaypoints]);
 
-    const handleAddWaypoint = (name: string, lat: number, lng: number) => {
-        setCustomWaypoints(prev => [...prev, { name, lat, lng }]);
+    const handleAddWaypoint = (name: string, description: string, lat: number, lng: number) => {
+        setCustomWaypoints(prev => [...prev, { name, description, lat, lng }]);
     };
 
     const handleDeleteWaypoint = (lat: number, lng: number) => {

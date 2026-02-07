@@ -26,6 +26,7 @@ export interface Activity {
 
 export interface Waypoint {
   name: string;
+  description?: string;
   lat: number;
   lng: number;
 }

@@ -1,5 +1,6 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import L from 'leaflet';
+import { MapPin, X, Save } from 'lucide-react';
 import { Activity, UserLocation, Coords, Waypoint } from '../types';
 import { GPX_WAYPOINTS, GENOVA_TRACK } from '../constants';
 
@@ -8,7 +9,7 @@ interface MapComponentProps {
     userLocation: UserLocation | null;
     focusedLocation: Coords | null;
     customWaypoints: Waypoint[];
-    onAddWaypoint: (name: string, lat: number, lng: number) => void;
+    onAddWaypoint: (name: string, description: string, lat: number, lng: number) => void;
     onDeleteWaypoint: (lat: number, lng: number) => void;
 }
 
@@ -25,6 +26,12 @@ const MapComponent: React.FC<MapComponentProps> = ({
     const layersRef = useRef<L.Layer[]>([]);
     const userMarkerRef = useRef<L.Marker | null>(null);
     const accuracyCircleRef = useRef<L.Circle | null>(null);
+
+    // Modal State
+    const [isModalOpen, setIsModalOpen] = useState(false);
+    const [tempCoords, setTempCoords] = useState<Coords | null>(null);
+    const [pointName, setPointName] = useState('');
+    const [pointDesc, setPointDesc] = useState('');
 
     // Initial Map Setup
     useEffect(() => {
@@ -72,11 +79,10 @@ const MapComponent: React.FC<MapComponentProps> = ({
         if (!map) return;
 
         const handleMapClick = (e: L.LeafletMouseEvent) => {
-            // Simple prompt to get name (UX could be improved with a modal, but this fits the "app" request efficiently)
-            const name = prompt("Nombre del nuevo punto de interés:");
-            if (name && name.trim() !== "") {
-                onAddWaypoint(name.trim(), e.latlng.lat, e.latlng.lng);
-            }
+            setTempCoords({ lat: e.latlng.lat, lng: e.latlng.lng });
+            setPointName('');
+            setPointDesc('');
+            setIsModalOpen(true);
         };
 
         map.on('click', handleMapClick);
@@ -84,7 +90,15 @@ const MapComponent: React.FC<MapComponentProps> = ({
         return () => {
             map.off('click', handleMapClick);
         };
-    }, [onAddWaypoint]);
+    }, []);
+
+    const handleSavePoint = () => {
+        if (pointName.trim() && tempCoords) {
+            onAddWaypoint(pointName.trim(), pointDesc.trim(), tempCoords.lat, tempCoords.lng);
+            setIsModalOpen(false);
+            setTempCoords(null);
+        }
+    };
 
     // Render Markers (Activities + Custom + Tracks)
     useEffect(() => {
@@ -128,22 +142,26 @@ const MapComponent: React.FC<MapComponentProps> = ({
             const popupDiv = document.createElement('div');
             popupDiv.style.fontFamily = "'Roboto Condensed', sans-serif";
             popupDiv.style.textAlign = "center";
+            popupDiv.style.minWidth = "150px";
+            
             popupDiv.innerHTML = `
-                <div style="font-weight: bold; color: #6d28d9; margin-bottom: 5px;">${wp.name}</div>
-                <div style="font-size: 10px; color: #64748b;">Tus marcadores</div>
+                <div style="font-weight: bold; color: #6d28d9; margin-bottom: 4px; font-size: 14px;">${wp.name}</div>
+                ${wp.description ? `<div style="font-size: 11px; color: #475569; margin-bottom: 8px; line-height: 1.4; white-space: pre-wrap;">${wp.description}</div>` : ''}
+                <div style="font-size: 9px; color: #94a3b8; font-style: italic; margin-bottom: 8px;">Tu marcador personal</div>
             `;
             
             const deleteBtn = document.createElement('button');
-            deleteBtn.innerText = "Eliminar";
-            deleteBtn.style.marginTop = "8px";
+            deleteBtn.innerText = "Eliminar Punto";
+            deleteBtn.style.width = "100%";
             deleteBtn.style.background = "#fee2e2";
             deleteBtn.style.color = "#991b1b";
             deleteBtn.style.border = "none";
-            deleteBtn.style.borderRadius = "4px";
-            deleteBtn.style.padding = "4px 8px";
+            deleteBtn.style.borderRadius = "6px";
+            deleteBtn.style.padding = "6px 0";
             deleteBtn.style.fontSize = "10px";
             deleteBtn.style.fontWeight = "bold";
             deleteBtn.style.cursor = "pointer";
+            deleteBtn.style.textTransform = "uppercase";
             
             deleteBtn.onclick = () => {
                 onDeleteWaypoint(wp.lat, wp.lng);
@@ -221,6 +239,67 @@ const MapComponent: React.FC<MapComponentProps> = ({
             <div className="absolute bottom-6 left-1/2 -translate-x-1/2 bg-white/90 backdrop-blur-sm px-4 py-2 rounded-full shadow-lg z-[400] text-[10px] font-bold text-slate-500 border border-white/20 pointer-events-none">
                 Toca el mapa para añadir un punto
             </div>
+
+            {/* Modal for Adding Waypoint */}
+            {isModalOpen && (
+                <div className="absolute inset-0 z-[1000] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-200">
+                    <div className="bg-white w-full max-w-sm rounded-3xl p-6 shadow-2xl animate-in zoom-in-95 duration-300">
+                        <div className="flex justify-between items-center mb-4">
+                            <div className="flex items-center text-blue-900 gap-2">
+                                <div className="bg-blue-100 p-2 rounded-full">
+                                    <MapPin size={20} className="text-blue-600" />
+                                </div>
+                                <h3 className="font-bold text-lg">Nuevo Marcador</h3>
+                            </div>
+                            <button onClick={() => setIsModalOpen(false)} className="text-slate-400 hover:text-slate-600">
+                                <X size={24} />
+                            </button>
+                        </div>
+                        
+                        <div className="space-y-4">
+                            <div>
+                                <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Nombre</label>
+                                <input 
+                                    type="text" 
+                                    value={pointName}
+                                    onChange={(e) => setPointName(e.target.value)}
+                                    placeholder="Ej: Restaurante favorito"
+                                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-blue-500 text-slate-800 placeholder:text-slate-400"
+                                    autoFocus
+                                />
+                            </div>
+                            
+                            <div>
+                                <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Descripción (Opcional)</label>
+                                <textarea 
+                                    value={pointDesc}
+                                    onChange={(e) => setPointDesc(e.target.value)}
+                                    placeholder="Añade notas, detalles o recordatorios..."
+                                    rows={3}
+                                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-blue-500 text-slate-800 placeholder:text-slate-400 resize-none"
+                                />
+                            </div>
+
+                            <div className="pt-2 flex gap-3">
+                                <button 
+                                    onClick={() => setIsModalOpen(false)}
+                                    className="flex-1 py-3 text-slate-500 font-bold text-sm bg-slate-100 rounded-xl hover:bg-slate-200 transition-colors"
+                                >
+                                    Cancelar
+                                </button>
+                                <button 
+                                    onClick={handleSavePoint}
+                                    disabled={!pointName.trim()}
+                                    className="flex-[2] py-3 bg-blue-600 text-white font-bold text-sm rounded-xl shadow-lg shadow-blue-200 hover:bg-blue-700 disabled:opacity-50 disabled:shadow-none transition-all flex items-center justify-center gap-2"
+                                >
+                                    <Save size={16} />
+                                    Guardar Punto
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 };
