@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import L from 'leaflet';
-import { MapPin, X, Save } from 'lucide-react';
+import { MapPin, X, Save, Search, Loader2 } from 'lucide-react';
 import { Activity, UserLocation, Coords, Waypoint } from '../types';
 import { GPX_WAYPOINTS, GENOVA_TRACK } from '../constants';
 
@@ -32,6 +32,12 @@ const MapComponent: React.FC<MapComponentProps> = ({
     const [tempCoords, setTempCoords] = useState<Coords | null>(null);
     const [pointName, setPointName] = useState('');
     const [pointDesc, setPointDesc] = useState('');
+
+    // Search State
+    const [searchQuery, setSearchQuery] = useState('');
+    const [searchResults, setSearchResults] = useState<any[]>([]);
+    const [isSearching, setIsSearching] = useState(false);
+    const searchTimeoutRef = useRef<any>(null);
 
     // Initial Map Setup
     useEffect(() => {
@@ -79,6 +85,12 @@ const MapComponent: React.FC<MapComponentProps> = ({
         if (!map) return;
 
         const handleMapClick = (e: L.LeafletMouseEvent) => {
+            // Close search results if open
+            if (searchResults.length > 0) {
+                setSearchResults([]);
+                return;
+            }
+
             setTempCoords({ lat: e.latlng.lat, lng: e.latlng.lng });
             setPointName('');
             setPointDesc('');
@@ -90,7 +102,7 @@ const MapComponent: React.FC<MapComponentProps> = ({
         return () => {
             map.off('click', handleMapClick);
         };
-    }, []);
+    }, [searchResults]);
 
     const handleSavePoint = () => {
         if (pointName.trim() && tempCoords) {
@@ -98,6 +110,56 @@ const MapComponent: React.FC<MapComponentProps> = ({
             setIsModalOpen(false);
             setTempCoords(null);
         }
+    };
+
+    // Search Logic
+    const handleSearchInput = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const val = e.target.value;
+        setSearchQuery(val);
+        
+        if (searchTimeoutRef.current) clearTimeout(searchTimeoutRef.current);
+        
+        if (val.length > 2) {
+            setIsSearching(true);
+            searchTimeoutRef.current = setTimeout(async () => {
+                try {
+                    // Append Genova, Italy to context the search
+                    const response = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(val + ' Genova Italy')}&limit=5&addressdetails=1`);
+                    const data = await response.json();
+                    setSearchResults(data);
+                } catch (error) {
+                    console.error("Search error", error);
+                    setSearchResults([]);
+                } finally {
+                    setIsSearching(false);
+                }
+            }, 600);
+        } else {
+            setSearchResults([]);
+            setIsSearching(false);
+        }
+    };
+
+    const handleSelectLocation = (result: any) => {
+        const lat = parseFloat(result.lat);
+        const lng = parseFloat(result.lon);
+        
+        if (mapInstanceRef.current) {
+            mapInstanceRef.current.flyTo([lat, lng], 17);
+            
+            L.popup()
+                .setLatLng([lat, lng])
+                .setContent(`
+                    <div style="font-family: 'Roboto Condensed', sans-serif; text-align: center;">
+                        <div style="font-weight: bold; color: #1e3a8a; font-size: 14px;">${result.display_name.split(',')[0]}</div>
+                        <div style="font-size: 10px; color: #64748b;">Resultado de búsqueda</div>
+                    </div>
+                `)
+                .openOn(mapInstanceRef.current);
+        }
+        
+        setSearchQuery('');
+        setSearchResults([]);
     };
 
     // Render Markers (Activities + Custom + Tracks)
@@ -236,6 +298,47 @@ const MapComponent: React.FC<MapComponentProps> = ({
     return (
         <div className="relative w-full h-full">
             <div ref={mapContainerRef} className="w-full h-full z-0" />
+            
+            {/* Search Bar */}
+            <div className="absolute top-4 left-4 right-14 z-[400] max-w-sm">
+                <div className="relative shadow-xl rounded-xl">
+                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                        {isSearching ? <Loader2 size={16} className="text-blue-500 animate-spin" /> : <Search size={16} className="text-slate-400" />}
+                    </div>
+                    <input
+                        type="text"
+                        className="block w-full pl-10 pr-10 py-3 border-none rounded-xl text-sm bg-white/95 backdrop-blur-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        placeholder="Buscar en Génova..."
+                        value={searchQuery}
+                        onChange={handleSearchInput}
+                    />
+                    {searchQuery.length > 0 && (
+                        <button 
+                            onClick={() => { setSearchQuery(''); setSearchResults([]); }}
+                            className="absolute inset-y-0 right-0 pr-3 flex items-center text-slate-400 hover:text-slate-600"
+                        >
+                            <X size={16} />
+                        </button>
+                    )}
+                </div>
+
+                {/* Search Results */}
+                {searchResults.length > 0 && (
+                    <div className="absolute mt-2 w-full bg-white rounded-xl shadow-xl overflow-hidden border border-slate-100 max-h-60 overflow-y-auto animate-in fade-in slide-in-from-top-2 duration-200">
+                        {searchResults.map((result, idx) => (
+                            <div 
+                                key={idx}
+                                onClick={() => handleSelectLocation(result)}
+                                className="px-4 py-3 hover:bg-blue-50 cursor-pointer border-b border-slate-50 last:border-0"
+                            >
+                                <div className="text-xs font-bold text-slate-800 truncate">{result.display_name.split(',')[0]}</div>
+                                <div className="text-[10px] text-slate-500 truncate">{result.display_name}</div>
+                            </div>
+                        ))}
+                    </div>
+                )}
+            </div>
+
             <div className="absolute bottom-6 left-1/2 -translate-x-1/2 bg-white/90 backdrop-blur-sm px-4 py-2 rounded-full shadow-lg z-[400] text-[10px] font-bold text-slate-500 border border-white/20 pointer-events-none">
                 Toca el mapa para añadir un punto
             </div>
